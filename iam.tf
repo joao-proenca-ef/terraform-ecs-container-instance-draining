@@ -21,13 +21,22 @@ data "aws_iam_policy_document" "lambda" {
     effect = "Allow"
     actions = [
       "autoscaling:CompleteLifecycleAction",
-      "autoscaling:DescribeAutoScalingGroups"
     ]
 
     resources = [
       var.autoscaling_group_arn
     ]
   }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "autoscaling:DescribeAutoScalingGroups"
+    ]
+
+    resources = ["*"]
+  }
+
 
   statement {
     effect = "Allow"
