@@ -10,12 +10,18 @@ SLEEP_TIME = 10
 ECS = boto3.client('ecs', region_name=REGION)
 ASG = boto3.client('autoscaling', region_name=REGION)
 SNS = boto3.client('sns', region_name=REGION)
+def check_active_instance(inst):
+  if(inst['status'] == 'ACTIVE'):
+    return True
+  else:
+    return False
 def find_ecs_instance_info(instance_id):
     paginator = ECS.get_paginator('list_container_instances')
     for list_resp in paginator.paginate(cluster=CLUSTER):
         arns = list_resp['containerInstanceArns']
         desc_resp = ECS.describe_container_instances(cluster=CLUSTER,
                                                      containerInstances=arns)
+        num_active_ecs_instances = len(filter(check_active_instance, desc_resp['containerInstances']));
         for container_instance in desc_resp['containerInstances']:
             if container_instance['ec2InstanceId'] != instance_id:
                 continue
@@ -23,10 +29,10 @@ def find_ecs_instance_info(instance_id):
                   (instance_id, container_instance['containerInstanceArn'],
                    container_instance['status'], container_instance['runningTasksCount']))
             return (container_instance['containerInstanceArn'],
-                    container_instance['status'], container_instance['runningTasksCount'], len(desc_resp['containerInstances']))
+                    container_instance['status'], container_instance['runningTasksCount'], num_active_ecs_instances)
     return None, None, 0
 def instance_has_running_tasks(instance_id, autoscalinggroup):
-    (instance_arn, container_status, running_tasks, num_ecs_instances) = find_ecs_instance_info(instance_id)
+    (instance_arn, container_status, running_tasks, num_active_ecs_instances) = find_ecs_instance_info(instance_id)
     if instance_arn is None:
         print('Could not find instance ID %s. Letting autoscaling kill the instance.' %
               (instance_id))
@@ -35,10 +41,10 @@ def instance_has_running_tasks(instance_id, autoscalinggroup):
     # NumOfInstances = len(ecs_autoscaling['Instances'])
     # NumOfInstances <= ecs_autoscaling['DesiredCapacity'] and
 
-    print('We are running these instances (%d) with desired capacity (%d)' % (num_ecs_instances, ecs_autoscaling['DesiredCapacity']))
+    print('We are running  %d active instances with %d desired capacity' % (num_active_ecs_instances, ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']))
 
-    if num_ecs_instances <= ecs_autoscaling['DesiredCapacity']:
-      print('Lets wait until we have more instances (%d) than desired capacity (%d)' % (num_ecs_instances, ecs_autoscaling['DesiredCapacity']))
+    if num_active_ecs_instances <= ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']:
+      print('Lets wait until we have more instances (%d) than desired capacity (%d)' % (num_active_ecs_instances, ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']))
       return True
 
     if container_status != 'DRAINING':
