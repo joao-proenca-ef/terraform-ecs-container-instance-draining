@@ -31,7 +31,7 @@ def instance_has_running_tasks(instance_id, autoscalinggroup):
         print('Could not find instance ID %s. Letting autoscaling kill the instance.' %
               (instance_id))
         return False
-    ecs_autoscaling = ASG.describe_auto_scaling_groups(AutoScalingGroupName=[autoscalinggroup])
+    ecs_autoscaling = ASG.describe_auto_scaling_groups(AutoScalingGroupNames=[autoscalinggroup])
     # NumOfInstances = len(ecs_autoscaling['Instances'])
     # NumOfInstances <= ecs_autoscaling['DesiredCapacity'] and
 
