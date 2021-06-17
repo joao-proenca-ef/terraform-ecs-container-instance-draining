@@ -21,7 +21,7 @@ def find_ecs_instance_info(instance_id):
         arns = list_resp['containerInstanceArns']
         desc_resp = ECS.describe_container_instances(cluster=CLUSTER,
                                                      containerInstances=arns)
-        num_active_ecs_instances = len(filter(check_active_instance, desc_resp['containerInstances']));
+        num_active_ecs_instances = len(list(filter(check_active_instance, desc_resp['containerInstances'])));
         for container_instance in desc_resp['containerInstances']:
             if container_instance['ec2InstanceId'] != instance_id:
                 continue
@@ -29,10 +29,10 @@ def find_ecs_instance_info(instance_id):
                   (instance_id, container_instance['containerInstanceArn'],
                    container_instance['status'], container_instance['runningTasksCount']))
             return (container_instance['containerInstanceArn'],
-                    container_instance['status'], container_instance['runningTasksCount'], num_active_ecs_instances)
+                    container_instance['status'], container_instance['runningTasksCount'], num_active_ecs_instances, len(desc_resp['containerInstances']))
     return None, None, 0
 def instance_has_running_tasks(instance_id, autoscalinggroup):
-    (instance_arn, container_status, running_tasks, num_active_ecs_instances) = find_ecs_instance_info(instance_id)
+    (instance_arn, container_status, running_tasks, num_active_ecs_instances, num_ecs_instances) = find_ecs_instance_info(instance_id)
     if instance_arn is None:
         print('Could not find instance ID %s. Letting autoscaling kill the instance.' %
               (instance_id))
@@ -43,11 +43,11 @@ def instance_has_running_tasks(instance_id, autoscalinggroup):
 
     print('We are running  %d active instances with %d desired capacity' % (num_active_ecs_instances, ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']))
 
-    if num_active_ecs_instances <= ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']:
-      print('Lets wait until we have more instances (%d) than desired capacity (%d)' % (num_active_ecs_instances, ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']))
-      return True
-
     if container_status != 'DRAINING':
+        if num_active_ecs_instances <= ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']:
+          print('Lets wait until we have more active instances (%d) than desired capacity (%d)' % (num_active_ecs_instances, ecs_autoscaling['AutoScalingGroups'][0]['DesiredCapacity']))
+          return True
+
         print('Setting container instance %s (%s) to DRAINING' %
               (instance_id, instance_arn))
         ECS.update_container_instances_state(cluster=CLUSTER,
