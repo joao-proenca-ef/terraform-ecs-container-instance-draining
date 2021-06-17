@@ -23,14 +23,24 @@ def find_ecs_instance_info(instance_id):
                   (instance_id, container_instance['containerInstanceArn'],
                    container_instance['status'], container_instance['runningTasksCount']))
             return (container_instance['containerInstanceArn'],
-                    container_instance['status'], container_instance['runningTasksCount'])
+                    container_instance['status'], container_instance['runningTasksCount'], len(desc_resp['containerInstances']))
     return None, None, 0
-def instance_has_running_tasks(instance_id):
-    (instance_arn, container_status, running_tasks) = find_ecs_instance_info(instance_id)
+def instance_has_running_tasks(instance_id, autoscalinggroup):
+    (instance_arn, container_status, running_tasks, num_ecs_instances) = find_ecs_instance_info(instance_id)
     if instance_arn is None:
         print('Could not find instance ID %s. Letting autoscaling kill the instance.' %
               (instance_id))
         return False
+    ecs_autoscaling = ASG.describe_auto_scaling_groups(AutoScalingGroupName=[autoscalinggroup])
+    # NumOfInstances = len(ecs_autoscaling['Instances'])
+    # NumOfInstances <= ecs_autoscaling['DesiredCapacity'] and
+
+    print('We are running these instances (%d) with desired capacity (%d)' % (num_ecs_instances, ecs_autoscaling['DesiredCapacity']))
+
+    if num_ecs_instances <= ecs_autoscaling['DesiredCapacity']:
+      print('Lets wait until we have more instances (%d) than desired capacity (%d)' % (num_ecs_instances, ecs_autoscaling['DesiredCapacity']))
+      return True
+
     if container_status != 'DRAINING':
         print('Setting container instance %s (%s) to DRAINING' %
               (instance_id, instance_arn))
@@ -44,7 +54,7 @@ def lambda_handler(event, context):
        msg['LifecycleTransition'].find('autoscaling:EC2_INSTANCE_TERMINATING') == -1:
         print('Exiting since the lifecycle transition is not EC2_INSTANCE_TERMINATING.')
         return
-    if instance_has_running_tasks(msg['EC2InstanceId']):
+    if instance_has_running_tasks(msg['EC2InstanceId'], msg['AutoScalingGroupName']):
         print('Tasks are still running on instance %s; posting msg to SNS topic %s' %
               (msg['EC2InstanceId'], event['Records'][0]['Sns']['TopicArn']))
         time.sleep(SLEEP_TIME)
