@@ -37,8 +37,8 @@ resource "aws_security_group" "test_group" {
 }
 
 module "ecs" {
-  source = "terraform-aws-modules/ecs/aws"
-  name   = "my-ecs"
+  source       = "terraform-aws-modules/ecs/aws"
+  cluster_name = "my-ecs"
 }
 module "asg" {
   source  = "terraform-aws-modules/autoscaling/aws"
@@ -57,7 +57,7 @@ module "example_module_test" {
   source                 = "../."
   autoscaling_group_name = module.asg.this_autoscaling_group_name
   autoscaling_group_arn  = module.asg.this_autoscaling_group_arn
-  ecs_cluster_arn        = module.ecs.this_ecs_cluster_arn
-  ecs_cluster_name       = module.ecs.this_ecs_cluster_name
+  ecs_cluster_arn        = module.ecs.cluster_arn
+  ecs_cluster_name       = module.ecs.cluster_name
   region                 = "eu-west-1"
 }
